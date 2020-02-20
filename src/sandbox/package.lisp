@@ -1,0 +1,71 @@
+;; ----------------------------------------------------------------------------
+;; Package definition for the clfs-sandbox package
+;; 
+;; Paul Griffioen 2020-2020
+;; ----------------------------------------------------------------------------
+
+(defpackage :clfs-sandbox
+  (:documentation "A virtual file system for the clfs package.")
+  (:use :common-lisp)
+  (:shadow "ENSURE-DIRECTORIES-EXIST"
+           "RENAME-FILE"
+           "DELETE-FILE"
+           "OPEN"
+           "CLOSE"
+           "WRITE-STRING"
+           "WITH-OPEN-FILE"
+           "FILE-LENGTH"
+           "FILE-POSITION"
+           "TRUENAME"
+           "PROBE-FILE"
+           "FILE-AUTHOR"
+           "FILE-WRITE-DATE"
+           "DIRECTORY")
+  (:export "MAKE-EMPTY-SANDBOX"
+           "COPY-SANDBOX"
+           "PATH-ROOT"
+           "SANDBOX-DIRECTORY-EXISTS-P"
+           "FILE-SYSTEM-EQUAL"
+           "MIRROR-FILE-SYSTEM-TO-DISK"
+           "MAKE-POPULATED-SANDBOX"
+           "STREAMS"
+           "TAKE-SNAPSHOT"
+           "PRINT-FILE-SYSTEM"
+           "PRINT-DIFF"
+           "SANDBOX-STREAM"
+           "PATH"
+           "SORTED-PATHNAME-LISTS-EQUAL"
+           
+           "CHDIR"
+           "COPY-FILE"
+           "DELETE-FILE-IF-EXISTS"
+           "DIRECTORY-EXISTS-P"
+           "DELETE-DIRECTORY-TREE"
+           "DELETE-EMPTY-DIRECTORY"
+           "RENAME-FILE-OVERWRITING-TARGET"
+           "ENSURE-ALL-DIRECTORIES-EXIST"
+           "COLLECT-SUB*DIRECTORIES"
+           "DIRECTORY*"
+           "SAFE-FILE-WRITE-DATE"
+           "SUBDIRECTORIES"
+           "DIRECTORY-FILES"
+           "TRUENAME*"
+           "TRUENAMIZE"
+           "PROBE-FILE*"
+
+           "ENSURE-DIRECTORIES-EXIST"
+           "RENAME-FILE"
+           "DELETE-FILE"
+           "OPEN"
+           "CLOSE"
+           "WRITE-STRING"
+           "WITH-OPEN-FILE"
+           "FILE-LENGTH"
+           "FILE-POSITION"
+           "TRUENAME"
+           "PROBE-FILE"
+           "FILE-AUTHOR"
+           "FILE-WRITE-DATE"
+           "DIRECTORY"
+           "GETCWD"
+           "FILE-EXISTS-P"))
