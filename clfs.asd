@@ -1,5 +1,5 @@
 ;; ----------------------------------------------------------------------------
-;; System definition for the fs-sandbox package
+;; System definition for the clfs package
 ;; 
 ;; Copyright (c) 2020 Paul Griffioen
 ;; 
