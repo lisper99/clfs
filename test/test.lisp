@@ -60,7 +60,15 @@ test-contracts to test the file system actions."
 (defun test-contracts (directory)
   "Tests all file system actions."
   (let ((*default-pathname-defaults* (pathname directory)))
-    (test-file-system-actions directory :mode :execute :target 100)))
+    (test-file-system-actions directory :mode :execute :target 1000)))
+
+(defun run-scenario (file)
+  "Run a dumped scenario without leaving trash in globals."
+  (let ((clfs:*whitelist* ())
+        (*action-log* ())
+        (*opened-test-streams* ()))
+    (unwind-protect (load file)
+      (reset-test-streams))))
 
 ;; ----------------------------------------------------------------------------
 ;; test-copy-file-system
@@ -400,7 +408,6 @@ a random file system."
                                          (format t "~%* Running test ~A:" name)
                                          (terpri))
                                        (push (cons name args) *action-log*)
-                                       ;;(setf *snapshot* (take-snapshot))
                                        (apply name args)))))
                        (incf success-count)
                        (setf (gethash name success-table)
@@ -409,11 +416,8 @@ a random file system."
                          (format t "~%* Test ~A finished" name )
                          (format t "~%result: ~{~A~^,~%~}~%" results))
                        (when (= 1 verbosity)
-                         (when (zerop (mod success-count
-                                           (ceiling target 80)))
-                           ;;(princ ".")
-                           (format t "~%~A/~A"
-                                   success-count target))))))
+                         (when (zerop (mod success-count (ceiling target 80)))
+                           (format t "~%~A/~A" success-count target))))))
                  (keep-testing ()
                    :report (lambda (stream)
                              (format stream "Keep testing")))
@@ -497,9 +501,7 @@ a random file system."
     successes))
 
 (defun fresh-test-dir (name &key directory)
-  (assert directory)
   (loop
-     initially (assert (< 0 (length name)))
      for tries = 0 then (+ tries 1)
      for dir = (format nil "~A~A~2,'0D/" directory name tries)
      while (clfs:directory-exists-p dir)
@@ -512,7 +514,6 @@ a random file system."
 
 (defun fresh-filename (directory name)
   (loop
-     initially (assert (< 0 (length name)))
      for tries = 0 then (+ tries 1)
      for filename = (format nil "~A-~4,'0D.lisp" name tries)
      for path = (merge-pathnames filename directory)
@@ -529,7 +530,7 @@ a random file system."
   "A list of list expressions that recreates the directories and files
 in snapshot."
   (loop
-     for path in snapshot
+     for path in (reverse snapshot)
      collect (list (if (uiop:directory-pathname-p path)
                        'ensure-directories-exist
                        'create-file)
@@ -564,6 +565,12 @@ in snapshot."
           (format s "~%;   Lisp version = ~A" (lisp-implementation-version))
           (format s "~%")
           (format s "~%(setf clfs:*whitelist* '(~S))" test-dir)
+          (format s "~%")
+          (format s "~%; Streams:")
+          (loop
+             for stream in *opened-test-streams*
+             for i = 0 then (+ i 1)
+             do (format s "~%; ~A) ~S" i stream))
           (format s "~%")
           (format s "~%(unless (clfs:directory-exists-p ~S)" test-dir)
           (format s "~%  (error \"Test directory ~A does not exist\"))"

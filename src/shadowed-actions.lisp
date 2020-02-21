@@ -84,7 +84,7 @@
       (not (wild-pathname-p new-name))
       (uiop:file-pathname-p name)
       (file-exists-p filespec)
-      #+windows(not (open-file-p filespec))
+      (not (open-file-p filespec))
       (directory-exists-p (uiop:pathname-directory-pathname name))
       (not (probe-file* name)))))
 
@@ -178,8 +178,6 @@
     (uiop:file-pathname-p filename)
     (not (directory-exists-p filename))
     ;;(not (open-file-p filename))
-    ;; Why?
-    #+sbcl (not (null if-does-not-exist))
     (if (file-exists-p filename)
         (or (equal direction :input)
             (equal direction :probe)
@@ -193,12 +191,16 @@
    (validate-access filename)
    (if (execute-p)
        (let ((stream
-              (cl:open filename
-                       :direction direction
-                       :element-type element-type
-                       :if-exists if-exists
-                       :if-does-not-exist if-does-not-exist
-                       :external-format external-format)))
+              ;; fix for sbcl
+              (if (and (null if-does-not-exist)
+                       (null (file-exists-p filename)))
+                  nil
+                  (cl:open filename
+                           :direction direction
+                           :element-type element-type
+                           :if-exists if-exists
+                           :if-does-not-exist if-does-not-exist
+                           :external-format external-format))))
          (when stream
            (setf *open-streams* (cons stream *open-streams*)))
          stream)
