@@ -17,7 +17,6 @@ Some applications are
 * Catch errors before they occur
 * Limit code access to parts of a disk
 * Test code automatically with contracts
-* Test conformance of Common Lisp implementations
 
 
 The sandbox assumes a single process with complete control over the
@@ -144,10 +143,12 @@ following code function `copy-file` has access to `dir-a` and `dir-b`.
 ```
 
 
-### Define Your Own Contracts
+### Making functions sandboxable
 
-Code that reads from file cannot be run in a sandbox. In that case you
-can define your own action with macro `defaction`.
+A function that depends on file contents cannot be run in a sandbox. To make 
+such a function suitable for use in a sandbox function `clfs:execute-p` (or 
+its opposite `clfs:simulate-p`) can be used to skip the offending reading or
+writing.
 
 The virtual file system can simulate file system manipulations but
 since it does not store any file contents it cannot do any
@@ -156,27 +157,82 @@ disregarded and cannot be read back. This means that actions cannot be
 simulated if they depend on the contents of the file system. For some
 situations a useful pattern is to make a plan outside the sandbox and
 next run that plan inside a sandbox. But for functions that read file
-contents this is not sufficient. For such functions a contract can be
-defined with macro `defaction`.
+contents this is not sufficient. To make such functions sandboxable the
+offending behaviour needs to be avoided.
 
-
-Consider the following code that reads the contents of file `in`,
- converts it and writes the result in file `out` if necessary.
+Consider the following function `convert-file` that reads the contents 
+of file `in`, converts it and writes the result in file `out` if necessary.
+This function cannot be called in a sandbox because it reads from a file.
 
 ```
-(when (dirty-p in out)
-  (with-open-file (s out
-                     :direction :output
-                     :if-does-not-exist :create
-                     :if-exists :supersede)
-    (write-converted (read-contents in) s)))
+(defun convert-file (in out)
+  (when (dirty-p in out)
+    (with-open-file (s out
+                       :direction :output
+                       :if-does-not-exist :create
+                       :if-exists :supersede)
+      (write-converted (read-contents in) s))))
 ```
 
-Functions `read-contents` and `write-converted` are problematic for a
-simulation.  Since function `dirty-p` does not read the file it can
-still be implemented. We will do that in the next section. In this
-section we will define an action to convert a file and call `dirty-p`
-outside the sandbox as follows.
+The question is how to make the function sandboxable. To do this requires
+replacing file system calls by the `clfs` version and skipping any reading.
+
+Function `dirty-p` does not read file contents and can be implemented
+with sandbox functions. A possible implementation is:
+
+```
+(defun dirty-p (in out)
+  (if (clfs:file-exists-p in)
+      (or (not (clfs:file-exists-p out))
+          (< (clfs:file-write-date out)
+             (clfs:file-write-date in)))
+      (error 'file-error :pathname in)))
+```
+
+This implementation can be called from within a sandbox because it uses 
+only `clfs` functions for file access. It does not require any further
+change because it does not do any reading or writing.
+
+Functions `read-contents` and `write-converted` are the problematic
+cases because they manipulate file contents. Using `clfs` function 
+`execute-p` the calls to them can be skipped as follows:
+
+```
+(defun convert-file (in out)
+  (when (dirty-p in out)
+    (clfs:with-open-file (s out
+                            :direction :output
+                            :if-does-not-exist :create
+                            :if-exists :supersede)
+      (when (clfs:execute-p)
+        (write-converted (read-contents in) s)))))
+```
+
+During a simulation this version still creates the file, but the
+problematic reading and writing is skipped. In this way function
+`convert-file` is made suitable for calls from a sandbox.
+
+To make a function sandboxable it is sufficient to replace file 
+system calls by the `clfs` version and avoid reading (and writing)
+files, but to take advantage of `clfs`'s pre- and post-conditions 
+you need to wrap the sandboxable version in a contract definition.
+
+
+
+### Define Your Own Contracts
+
+You can define your own contracts with macro `defaction`. This macro
+expects a name and arguments and defines a function just like macro
+`defun`, but instead of a body it expects four bodies, one for the
+pre-condition, one for the body, one for the post-condition and one
+for the difference condition. A difference condition is a special post-
+condition that compares before and after snapshots of the file system.
+
+
+In this section we will define an action to convert a file, but to keep
+it simple the call to  `dirty-p` is omitted. The dirty check makes the
+conditions more complex and is handled in the next section. In this section
+the call is kept outside the sandbox. A possible use is as follows.
 
 ```
 (when (dirty-p in out)
@@ -184,13 +240,7 @@ outside the sandbox as follows.
     (convert-file in out)))
 ```
 
-Macro `defaction` expects a name and arguments and defines a function
-just like macro `defun`, but instead of a body it expects four bodies,
-one for the pre-condition, one for the body, one for the
-post-condition and one for the difference condition. A difference
-condition is a special post-condition that compares before and after
-snapshots of the file system.  One possible action definition for the
-previous code is:
+A possible action definition without the dirty check is:
 
 ```
 (clfs:defaction convert-file (in out)
@@ -235,11 +285,7 @@ already exist and that the output file's directory does exist.
 
 The action body is the actual function body. Inside the body function
 `execute-p` and `simulate-p` can be used to test if the action is
-executed or simulated. They test whether `*simulate*` is nil or
-not. In this case `execute-p` is used to skip reading and writing the
-file. During a simulation the file is still created but the
-problematic reading and writing is skipped. In this way function
-`convert-file` is made suitable for calls from a sandbox.
+executed or simulated, just as in the previous section.
 
 
 The post-condition is a function that expects the action body's
@@ -258,7 +304,7 @@ system is correct. In this case it tests that no files are removed and
 that only the created file is added.
 
 
-With the contract defined function `convert-file` can now be called
+With the contract defined, function `convert-file` can now be called
 from inside a sandbox and can also be tested automatically.
 
 
@@ -267,24 +313,10 @@ from inside a sandbox and can also be tested automatically.
 
 The action from the previous section was relatively simple, but you
 often encounter situations were the conditions need to remember some
-state. An example is when the dirty test is added to the function.
+state. An example is when the dirty test is part of the convert function.
 
 
-Function `dirty-p` does not read file contents and can be implemented
-with sandbox functions. A possible implementation is:
-
-```
-(defun dirty-p (in out)
-  (if (clfs:file-exists-p in)
-      (or (not (clfs:file-exists-p out))
-          (< (clfs:file-write-date out)
-             (clfs:file-write-date in)))
-      (error 'file-error :pathname in)))
-```
-
-This functions works fine outside a sandbox as in the previous
-section, but because it uses sandbox functions it can also be called
-from within a sandbox. In this case we use it inside function
+In this section we use function `dirty-p` inside function
 `convert-file` and return a non-nil value if the file was written and
 nil otherwise. A possible definition is as follows.
 
