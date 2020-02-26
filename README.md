@@ -326,18 +326,18 @@ nil otherwise. A possible definition is as follows.
   file out."
 
   (:pre-condition
-   (and (file-exists-p in)
-        (directory-exists-p
+   (and (clfs:file-exists-p in)
+        (clfs:directory-exists-p
          (uiop:pathname-directory-pathname out))))
 
   (:body
    (handler-case
        (when (dirty-p in out)
-         (with-open-file (s out
-                            :direction :output
-                            :if-does-not-exist :create
-                            :if-exists :supersede)
-           (when (execute-p)
+         (clfs:with-open-file (s out
+                                 :direction :output
+                                 :if-does-not-exist :create
+                                 :if-exists :supersede)
+           (when (clfs:execute-p)
              (write-converted (read-contents in) s)))
          t)
      (file-error () nil)))
@@ -346,16 +346,16 @@ nil otherwise. A possible definition is as follows.
    (let ((needed-update (dirty-p in out)))
      (lambda (result)
        (and (implies result needed-update)
-            (implies result (file-exists-p out))))))
+            (implies result (clfs:file-exists-p out))))))
 
   (:difference
    (declare (ignore in))
-    (let ((existed (file-exists-p out)))
+    (let ((existed (clfs:file-exists-p out)))
       (lambda (result)
         (lambda (removed added)
           (and (null removed)
                (if (and result (not existed))
-                   (equal added (list (truename out)))
+                   (equal added (list (clfs:truename out)))
                    (null added))))))))
 ```
 
