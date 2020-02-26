@@ -235,8 +235,8 @@ conditions more complex and is handled in the next section. In this section
 the call is kept outside the sandbox. A possible use is as follows.
 
 ```
-(when (dirty-p in out)
-  (with-sandbox (dir)
+(with-sandbox (dir)
+  (when (dirty-p in out)
     (convert-file in out)))
 ```
 
