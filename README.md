@@ -76,11 +76,12 @@ values.
 
 ```
 (clfs:with-sandbox (code-dir
-                          :kind :both     ;; or :execute, or :simulate
-                          :test-pre t
-                          :test-post nil
-                          :test-diff nil
-                          :confine t))
+                    :kind :both    ;; or :execute, or :simulate
+                    :test-pre nil
+                    :test-post nil
+                    :test-diff nil
+                    :confine t
+                    :close-streams t)
   (clfs:delete-file "foo.lisp"))
 ```
 
@@ -112,13 +113,17 @@ value. An error is thrown when a file or directory outside the
 directory or any of its subdirectories is accessed.
 
 
+When `:close-streams` has a non-nil value then any stream that was opened
+during the evaluation of the sandbox body is closed before leaving the 
+body.
+
+
 The parameters correspond with global variables `*test-pre*`,
 `*test-post*`, `*test-diff*` and `*confine*`. The macro binds the
 global variables and all actions and observers react to them. The
 sandbox is bound to variable `*sandbox*`. Whether code is simulated or
 executed is controlled by variable `*simulate*`.  To limit access the
-macro adds the directory to global `*whitelist*`. Use this variable or
-macro `with-access` from the next section to further control access.
+macro adds the directory to global `*whitelist*`.
 
 
 
@@ -177,8 +182,8 @@ This function cannot be called in a sandbox because it reads from a file.
 The question is how to make the function sandboxable. To do this requires
 replacing file system calls by the `clfs` version and skipping any reading.
 
-Function `dirty-p` does not read file contents and can be implemented
-with sandbox functions. A possible implementation is:
+Function `dirty-p` does not read file contents so it only requires replacing
+lisp or uiop functions by the clfs versions. A possible implementation is:
 
 ```
 (defun dirty-p (in out)
@@ -190,8 +195,7 @@ with sandbox functions. A possible implementation is:
 ```
 
 This implementation can be called from within a sandbox because it uses 
-only `clfs` functions for file access. It does not require any further
-change because it does not do any reading or writing.
+only `clfs` functions for file access.
 
 Functions `read-contents` and `write-converted` are the problematic
 cases because they manipulate file contents. Using `clfs` function 
@@ -229,10 +233,11 @@ for the difference condition. A difference condition is a special post-
 condition that compares before and after snapshots of the file system.
 
 
-In this section we will define an action to convert a file, but to keep
-it simple the call to  `dirty-p` is omitted. The dirty check makes the
-conditions more complex and is handled in the next section. In this section
-the call is kept outside the sandbox. A possible use is as follows.
+In this section we will define action `convert-file` to convert a file,
+but to keep it simple the call to `dirty-p` is omitted. The dirty check 
+makes the conditions more complex and is handled in the next section. 
+In this section the call is kept outside the function. A possible use is 
+as follows.
 
 ```
 (with-sandbox (dir)
