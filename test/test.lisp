@@ -327,7 +327,7 @@ original."
                       :max-attempts max-attempts
                       :generator 'random-action
                       :test-post t
-                      :test-diff nil))))
+                      :test-diff t))))
   (values))
 
 (defun test-actions (directory scenario-directory &key
