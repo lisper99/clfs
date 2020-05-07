@@ -142,15 +142,14 @@ output."
     (when *test-pre*
       (unless (funcall pre-condition)
         (cerror "Evaluate body anyway"
-                (format nil "Pre condition for ~A fails" name))))
+                "Pre condition for ~A fails" name)))
     (let ((results (multiple-value-list (funcall body))))
       (when *test-post*
         (unless (apply post-condition results)
           (cerror "Return as if successful"
-                  (format nil
-                          "Post condition for ~A fails for results (~{~A~^ ~})"
-                          name
-                          results))))
+                  "Post condition for ~A fails for results (~{~A~^ ~})"
+                  name
+                  results)))
       (when *test-diff*
         (let ((new-snapshot (take-snapshot)))
           (unless
@@ -162,11 +161,10 @@ output."
                          removed added))
             (cerror
              "Return as if successful"
-             (format nil
-                     "Difference condition for ~A fails for results (~{~A~^ ~}). Difference: ~A"
-                     name
-                     results
-                     (with-output-to-string (*standard-output*)
-                       (clfs-sandbox:print-diff snapshot new-snapshot)))))))
+             "Difference condition for ~A fails for results (~{~A~^ ~}). Difference: ~A"
+             name
+             results
+             (with-output-to-string (*standard-output*)
+               (clfs-sandbox:print-diff snapshot new-snapshot))))))
       (values-list results))))
 

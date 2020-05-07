@@ -188,11 +188,11 @@ sandboxable getcwd."
 (defun ensureable (path)
   "Can path be ensured? Sandboxable."
   (loop
-     for p = (absolute-pathname path)
-     then parent
+     for p = (absolute-pathname path) then parent
      for parent = (uiop:pathname-parent-directory-pathname p)
      until (uiop:pathname-equal p parent)
-     never (file-exists-p (string-right-trim "/" (namestring p)))))
+     never (uiop:file-exists-p
+            (merge-pathnames (first (last (pathname-directory p))) parent))))
 
 (defun open-file-p (file)
   "Is argument file the pathname of some open stream. Sandboxable."
@@ -204,7 +204,8 @@ sandboxable getcwd."
                          (clfs-sandbox:streams *sandbox*))
        thereis (and
                 (open-stream-p stream)
-                (equal (absolute-pathname (pathname stream)) abs)))))
+                (uiop:pathname-equal (absolute-pathname (pathname stream))
+                                     abs)))))
 
 (defun any-open-file-p (directory)
   "Walks directory directory on disk and checks if any file is open."

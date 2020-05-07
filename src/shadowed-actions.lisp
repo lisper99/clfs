@@ -26,15 +26,6 @@
 
 (in-package :clfs)
 
-(defun create-file (path)
-  (clfs:ensure-directories-exist
-   (uiop:pathname-directory-pathname path))
-  (close (clfs:open path
-               :direction :output
-               :if-does-not-exist :create
-               ;;:if-exists nil
-               )))
-
 ;; ----------------------------------------------------------------------------
 ;; Common Lisp actions
 ;; ----------------------------------------------------------------------------
@@ -59,7 +50,7 @@
    (lambda (pathspec created)
      (declare (ignore created))
      (and
-      (equal pathspec path)
+      (uiop:pathname-equal pathspec path)
       (directory-exists-p path))))
 
   (:difference
@@ -101,12 +92,12 @@
        ;; HyperSpec says (merge-pathnames new-name filespec) but
        ;; sbcl and ccl seem to do (merge-pathnames new-name filename).
        ;; Is that logical?
-       (let (;;(name (merge-pathnames new-name filespec))
-             (name (merge-pathnames new-name filename)))
+       (let (#-(or sbcl ccl)(name (merge-pathnames new-name filespec))
+             #+(or sbcl ccl)(name (merge-pathnames new-name filename)))
          (and
-          (equal default name)
-          (equal old filename)
-          (equal new (truename name)))))))
+          (uiop:pathname-equal default name)
+          (uiop:pathname-equal old filename)
+          (uiop:pathname-equal new (truename name)))))))
 
   (:difference
    (declare (ignore filespec new-name))
@@ -116,10 +107,10 @@
        (or (and
             (null removed)
             (null added)
-            (equal old new))
+            (uiop:pathname-equal old new))
            (and
-            (equal added (list new))
-            (equal removed (list old))))))))
+            (equals-single-pathname added new)
+            (equals-single-pathname removed old)))))))
 
 (defaction delete-file (filespec)
   "Sandboxable implementation of Common Lisp function delete-file."
@@ -148,7 +139,7 @@
        (lambda (removed added)
          (and
           (null added)
-          (equal removed (list truename))))))))
+          (equals-single-pathname removed truename)))))))
 
 ;; ----------------------------------------------------------------------------
 ;; Common Lisp stream actions
@@ -178,6 +169,7 @@
     (uiop:file-pathname-p filename)
     (not (directory-exists-p filename))
     ;;(not (open-file-p filename))
+    (not (and (equal if-exists :rename) (open-file-p filename)))
     (if (file-exists-p filename)
         (or (equal direction :input)
             (equal direction :probe)
@@ -222,15 +214,18 @@
          (and
           (null removed)
           (equiv (null added)
-                 (or existed
+                 (or (and existed
+                          (not (equal if-exists :rename)))
                      (and (not existed)
                           (equal if-does-not-exist nil))))
           (or
            (null added)
            (and
-            ;; clisp doesn't like the inner equal
-            ;; here. uiop:pathname-equal on pathnames would work
-            (equal added (list (truename (pathname stream))))))))))))
+            (equals-single-pathname added (truename (pathname stream))))
+           (and (equal if-exists :rename)
+                (null (rest added))
+                (loop for x in added
+                   always (is-bak-file filename x))))))))))
 
 (defaction close (stream &key abort)
   "Sandboxable implementation of Common Lisp function close."
@@ -272,7 +267,7 @@
         (null added)
         (or (null removed)
             (and ;;abort  hierop hikt ccl
-             (equal removed (list truename))))))))))
+             (equals-single-pathname removed truename)))))))))
 
 (defaction write-string (string &optional output-stream
                                 &key (start 0) (end nil))
@@ -327,7 +322,7 @@
    (let ((truename (truename pathspec)))
      (lambda (result)
        (declare (ignore result))
-       (equal (getcwd) truename))))
+       (uiop:pathname-equal (getcwd) truename))))
 
   (:difference
    (declare (ignore pathspec))
@@ -426,7 +421,7 @@
        (declare (ignore result))
        (lambda (removed added)
          (and (null added)
-              (equal removed (list true-name))))))))
+              (equals-single-pathname removed true-name)))))))
 
 (defaction delete-file-if-exists (filename)
   "Sandboxable version of uiop:delete-file-if-exists."
@@ -455,7 +450,7 @@
        (lambda (removed added)
          (and (null added)
               (if (and truename result)
-                  (equal removed (list truename))
+                  (equals-single-pathname removed truename)
                   (null removed))))))))
 
 (defaction rename-file-overwriting-target (filespec new-name)
@@ -466,7 +461,7 @@
      (and
       (not (wild-pathname-p filespec))
       (not (wild-pathname-p new-name))
-      (not (equal name (pathname filespec)))
+      (not (uiop:pathname-equal name (pathname filespec)))
       (file-exists-p filespec)
       (not (open-file-p filespec))
       (not (directory-exists-p name))
@@ -485,9 +480,9 @@
       (lambda (defaulted-new-name old-truename new-truename)
         (let ((name (merge-pathnames new-name filespec)))
           (and
-           (equal defaulted-new-name name)
-           (equal old-truename filespec-truename)
-           (equal new-truename (truename name)))))))
+           (uiop:pathname-equal defaulted-new-name name)
+           (uiop:pathname-equal old-truename filespec-truename)
+           (uiop:pathname-equal new-truename (truename name)))))))
   
   (:difference
    (let ((existed (file-exists-p (merge-pathnames new-name filespec))))
@@ -497,11 +492,11 @@
          (or
           (and (null removed)
                (null added)
-               (equal old-truename new-truename))
+               (uiop:pathname-equal old-truename new-truename))
           (and (or
                 (and existed (null added))
-                (equal added (list new-truename)))
-               (equal removed (list old-truename)))))))))
+                (equals-single-pathname added new-truename))
+               (equals-single-pathname removed old-truename))))))))
 
 (defaction ensure-all-directories-exist (pathnames)
   "Sandboxable version of uiop:ensure-all-directories-exist."
@@ -580,11 +575,11 @@
        (and (null removed)
             (if result
                 (let ((true-to (truename to)))
-                  (and (member true-to added :test #'equal)
+                  (and (member true-to added :test #'uiop:pathname-equal)
                        (loop
                           for new in added
                           always (or (subpathp* true-to new)
-                                     (equal true-to new)))))
+                                     (uiop:pathname-equal true-to new)))))
                 (null added)))))))
 
 ;; ----------------------------------------------------------------------------
@@ -603,12 +598,12 @@
   "Safe version of copy-file"
   
   (:pre-condition
-   (declare (ignore from to))
+   ;;(declare (ignore from to))
    (and
-    ;;(file-exists-p from)
+    (uiop:file-pathname-p from) ;;(file-exists-p from)
     ;; Or this for transaction behavior
     ;;(ensureable (uiop:pathname-parent-directory-pathname to))
-    ;;(uiop:file-pathname-p to)
+    (uiop:file-pathname-p to)
     ;;(not (probe-file to))
     t))
   
@@ -636,14 +631,14 @@
        (and (null removed)
             (if result
                 (let ((true-to (truename to)))
-                  (and (member true-to added :test #'equal)
+                  (and (member true-to added :test #'uiop:pathname-equal)
                        (loop
                           for new in added
                           always (or (subpathp* true-to new)
-                                     (equal true-to new)))))
+                                     (uiop:pathname-equal true-to new)))))
                 ;;(null added)
                 (loop
-                   with abs-to =  (absolute-pathname to)
+                   with abs-to = (absolute-pathname to)
                    for new in added
                    always (subpathp* abs-to new))))))))
 
@@ -737,7 +732,7 @@
                 (null added))
            (and result
                 (null added)
-                (equal removed (list truename)))))))))
+                (equals-single-pathname removed truename))))))))
 
 (defaction safe-rename-file (filespec new-name)
   "Safe variant of Common Lisp function rename-file."
@@ -769,11 +764,12 @@
        (implies
         default
         (let ( ;;(name (merge-pathnames new-name filespec)) sbcl error
-              (name (merge-pathnames new-name filename)))
+              #-(or sbcl ccl) (name (merge-pathnames new-name filespec))
+              #+(or sbcl ccl) (name (merge-pathnames new-name filename)))
           (and
-           (equal default name)
-           (equal old filename)
-           (equal new (truename name))))))))
+           (uiop:pathname-equal default name)
+           (uiop:pathname-equal old filename)
+           (uiop:pathname-equal new (truename name))))))))
 
   (:difference
    (declare (ignore filespec new-name))
@@ -783,10 +779,10 @@
                 (or (and
                      (null removed)
                      (null added)
-                     (equal old new))
+                     (uiop:pathname-equal old new))
                     (and
-                     (equal added (list new))
-                     (equal removed (list old)))))))))
+                     (equals-single-pathname added new)
+                     (equals-single-pathname removed old))))))))
 
 (defaction safe-rename-file-overwriting-target (filespec new-name)
   "Sandboxable version of uiop:rename-file-overwriting-target."
@@ -796,7 +792,7 @@
      (and
       (not (wild-pathname-p filespec))
       (not (wild-pathname-p new-name))
-      (not (equal name (pathname filespec)))
+      (not (uiop:pathname-equal name (pathname filespec)))
       (file-exists-p filespec)
 ;;      (not (open-file-p filespec))
       (not (directory-exists-p name))
@@ -819,9 +815,9 @@
         (implies defaulted-new-name
         (let ((name (merge-pathnames new-name filespec)))
           (and
-           (equal defaulted-new-name name)
-           (equal old-truename filespec-truename)
-           (equal new-truename (truename name))))))))
+           (uiop:pathname-equal defaulted-new-name name)
+           (uiop:pathname-equal old-truename filespec-truename)
+           (uiop:pathname-equal new-truename (truename name))))))))
   
   (:difference
    (let ((existed (file-exists-p (merge-pathnames new-name filespec))))
@@ -832,11 +828,11 @@
           (and (null removed)
                (null added)
                (or (null defaulted-new-name)
-                   (equal old-truename new-truename)))
+                   (uiop:pathname-equal old-truename new-truename)))
           (and (or
                 (and existed (null added))
-                (equal added (list new-truename)))
-               (equal removed (list old-truename)))))))))
+                (equals-single-pathname added new-truename))
+               (equals-single-pathname removed old-truename))))))))
 
 ;; ----------------------------------------------------------------------------
 ;; Extra: copy-directory
@@ -922,7 +918,7 @@ to the directory."
      (lambda (removed added)
        (and result
             (null removed)
-            (equal added (list (truename filespec))))))))
+            (equals-single-pathname added (truename filespec)))))))
 
 (defaction unzip-file (zipfile directory)
   "Unzips the zip file zipfile in directory."
@@ -1017,4 +1013,4 @@ directory? Does not compare file contents."
      (lambda (removed added)
        (and (null removed)
             (implies added
-                     (equal added (list (truename filespec)))))))))
+                     (equals-single-pathname added (truename filespec))))))))

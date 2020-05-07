@@ -71,7 +71,7 @@ sequence. It is an error if sequence is empty."
                               *opened-test-streams*
                               (clfs-sandbox:streams clfs:*sandbox*))
                           1 0))
-        (unsafe-weight 0))
+        (unsafe-weight 1))
     (weighted-choice
 
      ;; Common Lisp
@@ -79,7 +79,7 @@ sequence. It is an error if sequence is empty."
      (0 (random-compile-file-action directory)) ;todo
      (unsafe-weight (random-delete-file-action directory))
      (10 (random-ensure-directories-exist-action directory))
-     ((* unsafe-weight 10) (random-rename-file-action directory))
+     ((* unsafe-weight 100) (random-rename-file-action directory))
 
      ;; UIOP
      (0 (random-chdir-action directory)) ;working directory is ignored

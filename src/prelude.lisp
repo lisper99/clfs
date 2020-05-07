@@ -163,6 +163,28 @@ pathnames. Sandboxable."
 (defun vary-file-type (file type)
   (merge-pathnames (make-pathname :name (pathname-name file) :type type) file))
 
+(defun is-bak-file (original bak)
+  "Could file bak have been created by open as back up for file
+  original?"
+  (and (uiop:pathname-equal (uiop:pathname-directory-pathname original)
+                            (uiop:pathname-directory-pathname bak))
+       (equal (pathname-name original) (pathname-name bak))))
+
+(defun equals-single-pathname (list pathname)
+  "Non nil if list contains pathname as the single element."
+  (and
+   list
+   (uiop:pathname-equal (first list) pathname)
+   (null (rest list))))
+
+(defun create-file (path)
+  "Creates an empty file for the given path if it does not exist."
+  (clfs:ensure-directories-exist
+   (uiop:pathname-directory-pathname path))
+  (close (clfs:open path
+               :direction :output
+               :if-does-not-exist :create)))
+
 ;; ----------------------------------------------------------------------------
 ;; Copied from cl:with-open-file
 ;; ----------------------------------------------------------------------------

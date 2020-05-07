@@ -327,7 +327,7 @@ original."
                       :max-attempts max-attempts
                       :generator 'random-action
                       :test-post t
-                      :test-diff t))))
+                      :test-diff nil))))
   (values))
 
 (defun test-actions (directory scenario-directory &key
@@ -589,26 +589,40 @@ in snapshot."
           (format s "~%; (clfs:chdir ~S)" test-dir)
           (format s "~%")
           (format s "~%(setf clfs::*open-streams* nil)")
-          (format s "~%(setf clfs:*test-pre* t)")
-          (format s "~%(setf clfs:*test-post* t)")
-          (format s "~%(setf clfs:*test-diff* t)")
           (format s "~%")
           (format s "~%(if t  ;; Setting to nil might be sufficient to reproduce the error and simplify analysis")
           (format s "~%")
-          (format s "~%  ;; Scenario:~%" )
           (format s "~%  (progn")
+          (format s "~%    (setf clfs:*test-pre* nil)")
+          (format s "~%    (setf clfs:*test-post* nil)")
+          (format s "~%    (setf clfs:*test-diff* nil)")
+          (format s "~%    ;; Scenario:~%" )
           (loop
-             for action in actions
-             do (format s "~%    (~{~S~^ ~})" (quote-action action)))
+             for sub on actions
+             while (rest sub)
+             do (format s "~%    (~{~S~^ ~})" (quote-action (first sub)))
+             finally
+               (format s "~%    (setf clfs:*test-pre* t)")
+               (format s "~%    (setf clfs:*test-post* t)")
+               (format s "~%    (setf clfs:*test-diff* t)")
+               (format s "~%    ;; Error action:~%" )
+               (format s "~%    (~{~S~^ ~})" (quote-action (first sub))))
           (format s ")")
           (format s "~%  (progn")
+          (format s "~%    (setf clfs:*test-pre* nil)")
+          (format s "~%    (setf clfs:*test-post* nil)")
+          (format s "~%    (setf clfs:*test-diff* nil)")
           (format s "~2%    ;; Snapshot:~%")
           (loop
-             for x in snapshot
+             for xs on snapshot
+             for x = (first x)
              do (format s "~%    (~S ~S)"
                         (if (uiop:directory-pathname-p x)
                             'ensure-directories-exist 'create-file)
                         x))
+          (format s "~%    (setf clfs:*test-pre* t)")
+          (format s "~%    (setf clfs:*test-post* t)")
+          (format s "~%    (setf clfs:*test-diff* t)")
           (format s "~2%    ;; Action:~%")
           (format s "~%    (~{~S~^ ~})" (quote-action action))
           (format s "))"))))))
