@@ -213,19 +213,16 @@
        (lambda (removed added)
          (and
           (null removed)
-          (equiv (null added)
-                 (or (and existed
-                          (not (equal if-exists :rename)))
-                     (and (not existed)
-                          (equal if-does-not-exist nil))))
-          (or
-           (null added)
-           (and
-            (equals-single-pathname added (truename (pathname stream))))
-           (and (equal if-exists :rename)
-                (null (rest added))
-                (loop for x in added
-                   always (is-bak-file filename x))))))))))
+          (if existed
+              (if (equal if-exists :rename)
+                  (and (null (rest added))
+                       (loop for x in added
+                          always (is-bak-file filename x)))
+                  (null added))
+              (if (null if-does-not-exist)
+                  (null added)
+                  (equals-single-pathname added
+                                          (truename (pathname stream)))))))))))
 
 (defaction close (stream &key abort)
   "Sandboxable implementation of Common Lisp function close."
@@ -703,7 +700,7 @@
   (:pre-condition
     (and
      (not (wild-pathname-p filespec))
-     ;;(not (open-file-p filespec))
+     #+ccl(not (open-file-p filespec))
      (file-exists-p filespec)))
   
    (:body 
@@ -763,8 +760,7 @@
      (lambda (default &optional old new)
        (implies
         default
-        (let ( ;;(name (merge-pathnames new-name filespec)) sbcl error
-              #-(or sbcl ccl) (name (merge-pathnames new-name filespec))
+        (let (#-(or sbcl ccl) (name (merge-pathnames new-name filespec))
               #+(or sbcl ccl) (name (merge-pathnames new-name filename)))
           (and
            (uiop:pathname-equal default name)
@@ -813,11 +809,12 @@
     (let ((filespec-truename (truename filespec)))
       (lambda (defaulted-new-name &optional old-truename new-truename)
         (implies defaulted-new-name
-        (let ((name (merge-pathnames new-name filespec)))
-          (and
-           (uiop:pathname-equal defaulted-new-name name)
-           (uiop:pathname-equal old-truename filespec-truename)
-           (uiop:pathname-equal new-truename (truename name))))))))
+                 (let (#-(or ccl sbcl)(name (merge-pathnames new-name filespec))
+                       #+(or ccl sbcl)(name (merge-pathnames new-name filespec-truename)))
+                   (and
+                    (uiop:pathname-equal defaulted-new-name name)
+                    (uiop:pathname-equal old-truename filespec-truename)
+                    (uiop:pathname-equal new-truename (truename name))))))))
   
   (:difference
    (let ((existed (file-exists-p (merge-pathnames new-name filespec))))

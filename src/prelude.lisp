@@ -168,7 +168,8 @@ pathnames. Sandboxable."
   original?"
   (and (uiop:pathname-equal (uiop:pathname-directory-pathname original)
                             (uiop:pathname-directory-pathname bak))
-       (equal (pathname-name original) (pathname-name bak))))
+       #-ccl(equal (pathname-name original) (pathname-name bak))
+       #+ccl(equal (pathname-type bak) "tem")))
 
 (defun equals-single-pathname (list pathname)
   "Non nil if list contains pathname as the single element."
