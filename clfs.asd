@@ -43,8 +43,8 @@
   :version "0"
   :serial t
   :depends-on (:uiop
-               :trivial-download
-               :zip
+               #-clfs-no-extras :trivial-download
+               #-clfs-no-extras :zip
                :clfs/sandbox)
   :in-order-to ((test-op (test-op "clfs-test")))
   :components
@@ -53,5 +53,6 @@
    (:file "src/contract")
    (:file "src/shadowed-actions")
    (:file "src/shadowed-observers")
+   #-clfs-no-extras (:file "src/extras")
    (:file "src/clfs")))
 

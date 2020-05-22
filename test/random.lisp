@@ -87,7 +87,7 @@ sequence. It is an error if sequence is empty."
      (0 (random-compile-file*-action directory)) ;todo
      (0 (random-concatenate-files-action directory)) ;todo
      ((* 100 unsafe-weight) (random-copy-file-action directory))
-     (unsafe-weight (random-delete-directory-tree-action directory))
+     ((* 100 unsafe-weight) (random-delete-directory-tree-action directory))
      (100 (random-delete-empty-directory-action directory))
      (1 (random-delete-file-if-exists-action directory))
      (10 (random-ensure-all-directories-exist-action directory))
@@ -174,18 +174,21 @@ sequence. It is an error if sequence is empty."
          (1 (random-path :prefix directory)))))
 
 (defun random-delete-directory-tree-action (directory)
-  (list 'clfs:delete-directory-tree
-        (loop 
-           for dir = 
-             (weighted-choice
-              ;;(0 (random-stream))
-              (1 (random-fs-path directory))
-              (1 (random-path :prefix directory))
-              (1 (random-pathname :prefix directory)))
-           while  (equal (pathname directory) (pathname dir))
-           finally (return dir))
-        :validate (pick '(test-validator-pos test-validator-neg))
-        :if-does-not-exist (pick '(:ignore :error nil))))
+  (append
+   (list 'clfs:delete-directory-tree
+         (loop 
+            for dir = 
+              (weighted-choice
+               ;;(0 (random-stream))
+               (1 (random-fs-path directory))
+               (1 (random-path :prefix directory))
+               (1 (random-pathname :prefix directory)))
+            while  (equal (pathname directory) (pathname dir))
+            finally (return dir)))
+   (when (pick '(t nil))
+     (list :validate (pick '(test-validator-pos test-validator-neg))))
+   (when (pick '(t nil))
+     (list :if-does-not-exist (pick '(:ignore :error nil))))))
 
 (defun random-delete-empty-directory-action (directory)
   (list 'clfs:delete-empty-directory
