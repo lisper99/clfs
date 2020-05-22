@@ -97,7 +97,10 @@ evaluated when the antecedent is true."
     (lambda ()
       (lambda (removed added)
         (and (null removed)
-             (equal added (list (clfs:truename out))))))))
+             (and
+              added
+              (uiop:pathname-equal (first added) (clfs:truename out))
+              (null (rest added))))))))
 
 ;; ----------------------------------------------------------------------------
 ;; safe-convert-file
@@ -137,5 +140,8 @@ evaluated when the antecedent is true."
         (lambda (removed added)
           (and (null removed)
                (if (and result (not existed))
-                   (equal added (list (clfs:truename out)))
+                   (and
+                    added
+                    (uiop:pathname-equal (first added) (clfs:truename out))
+                    (null (rest added)))
                    (null added))))))))
