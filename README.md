@@ -276,11 +276,10 @@ A possible action definition without the dirty check is:
     (lambda ()
       (lambda (removed added)
         (and (null removed)
-             (let ((truename (clfs:truename out)))
-               (and
-                added
-                (uiop:pathname-equal (first added) truename)
-                (null (rest added)))))))))
+             (and
+              added
+              (uiop:pathname-equal (first added) (clfs:truename out))
+              (null (rest added))))))))
 ```
 
 The code defines action `convert-file` that expects arguments `in` and
@@ -364,11 +363,10 @@ nil otherwise. A possible definition is as follows.
         (lambda (removed added)
           (and (null removed)
                (if (and result (not existed))
-                   (let ((truename (clfs:truename out)))
-                     (and
-                      added
-                      (uiop:pathname-equal (first added) truename)
-                      (null (rest added))))
+                   (and
+                    added
+                    (uiop:pathname-equal (first added) (clfs:truename out))
+                    (null (rest added)))
                    (null added))))))))
 ```
 
