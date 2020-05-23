@@ -34,71 +34,72 @@
   "Defines sandboxable function name with arguments args. Options in
 definitions can be :body, :pre-condition, :post-condition
 and :difference. Only :body is required."
-  (flet ((strip-declare (body)
-           (if (when (listp body)
-                 (let ((first (first body)))
-                   (when (listp first)
-                     (equal (first first) 'declare))))
-               (rest body)
-               body)))
-    (loop
-       for def in definitions
-       if (when (listp def)
-            (member (first def)
-                    '(:body :pre-condition :post-condition :difference)))
-       collect def into defs
-       else collect def into non-defs
-       finally
-         (return
-           (let* ((body (let ((arg (assoc :body defs)))
-                          (if arg
-                              (cdr arg)
-                              (error ":body missing in action definition"))))
-                  (pre-arg (assoc :pre-condition defs))
-                  (post-arg (assoc :post-condition defs))
-                  (diff-arg (assoc :difference defs))
-                  (pre (if pre-arg
-                           (cdr pre-arg)
-                           (list t)))
-                  (post (if post-arg
-                            (cdr post-arg)
-                            `((lambda (&rest result)
-                                (declare (ignore result))
-                                t))))
-                  (diff (if diff-arg
-                            (cdr diff-arg)
-                            `((lambda (&rest result)
-                                (declare (ignore result))
-                                (lambda (added removed)
-                                  (declare (ignore added removed))
-                                  t))))))
-             `(progn
-                (defun ,name ,args
-                  ,@non-defs
-                  (perform-statement
-                   ',name
-                   (lambda () ,@(strip-declare body))
-                   (lambda () ,@(strip-declare pre))
-                   (let () ,@(strip-declare post))
-                   (let () ,@(strip-declare diff))))
-                (setf (get ',name :pre-condition)
-                      ,(if pre-arg
-                           `(lambda ,args ,@pre)
-                           `(lambda (&rest args)
-                              (declare (ignore args))
-                              ,@pre)))
-                (setf (get ',name :post-condition)
-                      ,(if post-arg
-                           `(lambda ,args ,@post)
-                           `(lambda (&rest args)
-                              (declare (ignore args))
-                              ,@post)))
-                (setf (get ',name :difference)
-                      ,(if diff-arg
-                           `(lambda ,args ,@diff)
-                           `(lambda (&rest args)
-                              (declare (ignore args))
-                              ,@diff)))))))))
+  (flet ((has-declare (body)
+           (when (listp body)
+             (let ((first (first body)))
+               (when (listp first)
+                 (equal (first first) 'declare))))))
+    (flet ((strip-declare (body)
+             (if (has-declare body) (rest body) body)))
+      (loop
+         for def in definitions
+         if (when (listp def)
+              (member (first def)
+                      '(:body :pre-condition :post-condition :difference)))
+         collect def into defs
+         else collect def into non-defs
+         finally
+           (return
+             (let* ((body (let ((arg (assoc :body defs)))
+                            (if arg
+                                (cdr arg)
+                                (error ":body missing in action definition"))))
+                    (pre-arg (assoc :pre-condition defs))
+                    (post-arg (assoc :post-condition defs))
+                    (diff-arg (assoc :difference defs))
+                    (pre (if pre-arg
+                             (cdr pre-arg)
+                             (list t)))
+                    (post (if post-arg
+                              (cdr post-arg)
+                              `((lambda (&rest result)
+                                  (declare (ignore result))
+                                  t))))
+                    (diff (if diff-arg
+                              (cdr diff-arg)
+                              `((lambda (&rest result)
+                                  (declare (ignore result))
+                                  (lambda (added removed)
+                                    (declare (ignore added removed))
+                                    t))))))
+               `(progn
+                  (defun ,name ,args
+                    ,@non-defs
+                    ,@(when (has-declare body) (list (first body)))
+                    (perform-statement
+                     ',name
+                     (lambda () ,@(strip-declare body))
+                     (lambda () ,@(strip-declare pre))
+                     (let () ,@(strip-declare post))
+                     (let () ,@(strip-declare diff))))
+                  (setf (get ',name :pre-condition)
+                        ,(if pre-arg
+                             `(lambda ,args ,@pre)
+                             `(lambda (&rest args)
+                                (declare (ignore args))
+                                ,@pre)))
+                  (setf (get ',name :post-condition)
+                        ,(if post-arg
+                             `(lambda ,args ,@post)
+                             `(lambda (&rest args)
+                                (declare (ignore args))
+                                ,@post)))
+                  (setf (get ',name :difference)
+                        ,(if diff-arg
+                             `(lambda ,args ,@diff)
+                             `(lambda (&rest args)
+                                (declare (ignore args))
+                                ,@diff))))))))))
 
 ;; ----------------------------------------------------------------------------
 ;; Testing action conditions
