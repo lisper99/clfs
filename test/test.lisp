@@ -647,5 +647,76 @@ action) instead of (apply (first action) (rest action))."
                                      '*opened-test-streams*))
                        (t arg))))))
 
+;; ----------------------------------------------------------------------------
+;; Variants using &rest args
+;; ----------------------------------------------------------------------------
 
+(defaction ensure-directories-exist-args-variant (path &rest args &key verbose)
+  "Variant of clfs:ensure-directories-exist for testing default args."
+  (:pre-condition
+   (declare (ignore args))
+   (clfs:test-pre-condition
+    'clfs:ensure-directories-exist path :verbose verbose))
+  (:body
+   (clfs::validate-access path)
+   (if (clfs:execute-p)
+       (apply #'cl:ensure-directories-exist path args)
+       (apply #'clfs-sandbox:ensure-directories-exist clfs:*sandbox* path args)))
+  (:post-condition
+   (declare (ignore args))
+   (clfs:post-condition-test
+    'clfs:ensure-directories-exist path :verbose verbose))
+  (:difference
+   (declare (ignore args))
+   (clfs:difference-test
+    'clfs:ensure-directories-exist path :verbose verbose)))
 
+(defaction close-args-variant (stream &rest args &key abort)
+  "Sandboxable implementation of Common Lisp function close."
+  (:pre-condition
+   (declare (ignore args))
+   (clfs:test-pre-condition
+    'clfs:close stream :abort abort))
+  (:body
+   (prog1 (if (clfs:execute-p)
+              (apply #'cl:close stream args)
+              (clfs-sandbox:close clfs:*sandbox* stream :abort abort))
+     (setf clfs::*open-streams* (remove stream clfs::*open-streams*))))
+  (:post-condition
+   (declare (ignore args))
+   (clfs:post-condition-test
+    'clfs:close stream :abort abort))
+  (:difference
+   (declare (ignore args))
+   (clfs:difference-test
+    'clfs:close stream :abort abort)))
+
+(defaction delete-directory-tree-args-variant (directory-pathname
+                                               &rest args
+                                               &key validate (if-does-not-exist :error))
+  "Sandboxable version of uiop:delete-directory-tree."
+  (:pre-condition
+   (declare (ignore args))
+   (clfs:test-pre-condition
+    'clfs:delete-directory-tree directory-pathname
+    :validate validate
+    :if-does-not-exist if-does-not-exist))
+  (:body
+   (clfs::validate-access directory-pathname)
+   (if (clfs:execute-p)
+       (apply #'uiop:delete-directory-tree directory-pathname args)
+       (clfs-sandbox:delete-directory-tree clfs:*sandbox* directory-pathname
+                                           :validate validate
+                                           :if-does-not-exist if-does-not-exist)))
+  (:post-condition
+   (declare (ignore args))
+   (clfs:post-condition-test
+    'clfs:delete-directory-tree directory-pathname
+    :validate validate
+    :if-does-not-exist if-does-not-exist))
+  (:difference
+   (declare (ignore args))
+   (clfs:difference-test
+    'clfs:delete-directory-tree directory-pathname
+    :validate validate
+    :if-does-not-exist if-does-not-exist)))

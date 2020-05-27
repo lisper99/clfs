@@ -76,9 +76,11 @@ sequence. It is an error if sequence is empty."
 
      ;; Common Lisp
      (close-weight (random-close-action directory))
+     (close-weight (random-close-action directory :args-variant t))
      (0 (random-compile-file-action directory)) ;todo
      (unsafe-weight (random-delete-file-action directory))
      (10 (random-ensure-directories-exist-action directory))
+     (10 (random-ensure-directories-exist-action directory :args-variant t))
      ((* unsafe-weight 100) (random-rename-file-action directory))
 
      ;; UIOP
@@ -88,6 +90,8 @@ sequence. It is an error if sequence is empty."
      (0 (random-concatenate-files-action directory)) ;todo
      ((* 100 unsafe-weight) (random-copy-file-action directory))
      ((* 100 unsafe-weight) (random-delete-directory-tree-action directory))
+     ((* 100 unsafe-weight) (random-delete-directory-tree-action
+                             directory :args-variant t))
      (100 (random-delete-empty-directory-action directory))
      (1 (random-delete-file-if-exists-action directory))
      (10 (random-ensure-all-directories-exist-action directory))
@@ -107,11 +111,13 @@ sequence. It is an error if sequence is empty."
 ;; Common Lisp random actions
 ;; ----------------------------------------------------------------------------
 
-(defun random-close-action (directory)
+(defun random-close-action (directory &key args-variant)
   (declare (ignore directory))
-  (list 'clfs:close
-        (random-stream)
-        :abort (pick '(nil t))))
+  (append
+   (list (if args-variant 'close-args-variant 'clfs:close)
+         (random-stream))
+   (when (pick '(t nil))
+     (list :abort (pick '(nil t))))))
 
 (defun random-compile-file-action (directory)
   (declare (ignore directory))
@@ -123,10 +129,14 @@ sequence. It is an error if sequence is empty."
          (1 (random-fs-path directory))
          (1 (random-path :prefix directory)))))
 
-(defun random-ensure-directories-exist-action (directory)
-  (list 'clfs:ensure-directories-exist
-        (random-path :prefix directory)
-        :verbose (pick '(nil t))))
+(defun random-ensure-directories-exist-action (directory &key args-variant)
+  (append
+   (list (if args-variant
+             'ensure-directories-exist-args-variant
+             'clfs:ensure-directories-exist)
+         (random-path :prefix directory))
+   (when (pick '(t nil))
+     (list :verbose (pick '(nil t))))))
 
 (defun random-open-action (directory)
   (list 'clfs:open
@@ -173,9 +183,11 @@ sequence. It is an error if sequence is empty."
          (1 (random-fs-path directory))
          (1 (random-path :prefix directory)))))
 
-(defun random-delete-directory-tree-action (directory)
+(defun random-delete-directory-tree-action (directory &key args-variant)
   (append
-   (list 'clfs:delete-directory-tree
+   (list (if args-variant
+             'delete-directory-tree-args-variant
+             'clfs:delete-directory-tree)
          (loop 
             for dir = 
               (weighted-choice

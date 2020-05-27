@@ -30,11 +30,11 @@
 ;; Common Lisp actions
 ;; ----------------------------------------------------------------------------
 
-(defaction ensure-directories-exist (path &rest args &key verbose)
+(defaction ensure-directories-exist (path &key verbose)
   "Sandboxable version of Common Lisp function ensure-directories-exist."
 
   (:pre-condition
-   (declare (ignore args verbose))
+   (declare (ignore verbose))
    (and
     (uiop:directory-pathname-p path)
     (ensureable path)))
@@ -42,11 +42,11 @@
   (:body
    (validate-access path)
    (if (execute-p)
-       (apply #' cl:ensure-directories-exist path args)
+       (cl:ensure-directories-exist path :verbose verbose)
        (clfs-sandbox:ensure-directories-exist *sandbox* path :verbose verbose)))
 
   (:post-condition
-   (declare (ignore args verbose))
+   (declare (ignore verbose))
    (lambda (pathspec created)
      (declare (ignore created))
      (and
@@ -54,7 +54,7 @@
       (directory-exists-p path))))
 
   (:difference
-   (declare (ignore args verbose))
+   (declare (ignore verbose))
    (lambda (pathspec created)
      (declare (ignore pathspec))
      (lambda (removed added)
@@ -146,7 +146,6 @@
 ;; ----------------------------------------------------------------------------
 
 (defaction open (filename
-                 &rest args
                  &key
                  (direction :input)
                  (element-type 'base-char)
@@ -164,7 +163,7 @@
   "Sandboxable implementation of Common Lisp function open."
 
   (:pre-condition
-   (declare (ignore args external-format element-type))
+   (declare (ignore external-format element-type))
    (and
     (not (wild-pathname-p filename))
     (uiop:file-pathname-p filename)
@@ -181,7 +180,6 @@
               (uiop:pathname-directory-pathname filename))))))
 
   (:body
-   (declare (ignore external-format element-type))
    (validate-access filename)
    (if (execute-p)
        (let ((stream
@@ -189,7 +187,12 @@
               (if (and (null if-does-not-exist)
                        (null (file-exists-p filename)))
                   nil
-                  (apply #'cl:open filename args))))
+                  (cl:open filename
+                           :direction direction
+                           :element-type element-type
+                           :if-exists if-exists
+                           :if-does-not-exist if-does-not-exist
+                           :external-format external-format))))
          (when stream
            (setf *open-streams* (cons stream *open-streams*)))
          stream)
@@ -199,12 +202,12 @@
                           :if-does-not-exist if-does-not-exist)))
 
   (:post-condition
-   (declare (ignore args if-does-not-exist external-format element-type))
+   (declare (ignore if-does-not-exist external-format element-type))
    (lambda (stream)
      (or (null stream) (typep stream 'stream))))
 
   (:difference
-   (declare (ignore args external-format element-type))
+   (declare (ignore external-format element-type))
    (let ((existed (file-exists-p filename)))
      (lambda (stream)
        (lambda (removed added)
@@ -222,11 +225,11 @@
                   (equals-single-pathname added
                                           (truename (pathname stream)))))))))))
 
-(defaction close (stream &rest args &key abort)
+(defaction close (stream &key abort)
   "Sandboxable implementation of Common Lisp function close."
 
   (:pre-condition
-   (declare (ignore args abort #-ccl stream))
+   (declare (ignore abort #-ccl stream))
    ;; Why does ccl not allow non-existing files? close has no
    ;; exceptional situations.
    #+ccl (and (open-stream-p stream) (file-exists-p (pathname stream)))
@@ -235,12 +238,12 @@
 
   (:body
    (prog1 (if (execute-p)
-              (apply #'cl:close stream args)
+              (cl:close stream :abort abort)
               (clfs-sandbox:close *sandbox* stream :abort abort))
      (setf *open-streams* (remove stream *open-streams*))))
 
   (:post-condition
-   (declare (ignore args abort))
+   (declare (ignore abort))
    (let ((openp (open-stream-p stream)))
      (lambda (result)
        (and
@@ -252,7 +255,7 @@
                  (not (open-stream-p stream)))))))
 
   (:difference
-   (declare (ignore args abort))
+   (declare (ignore abort))
    (let ((truename (when (file-exists-p (pathname stream))
                      (truename (pathname stream)))))
    (lambda (result)
@@ -264,33 +267,27 @@
             (and ;;abort  hierop hikt ccl
              (equals-single-pathname removed truename)))))))))
 
-(defaction write-string (string &optional (output-stream
-                                           *standard-output*
-                                           output-stream-p)
-                                &rest args
+(defaction write-string (string &optional (output-stream *standard-output*)
                                 &key (start 0) (end nil))
   "Sandboxable version of Common Lisp function write-string."
 
   (:pre-condition
-   (declare (ignore args output-stream-p string start end))
+   (declare (ignore string start end))
    (implies output-stream (open-stream-p output-stream)))
 
   (:body
-   (declare (ignore start end))
    (if (execute-p)
-       (if output-stream-p
-           (apply #'cl:write-string string output-stream args)
-           (apply #'cl:write-string string args))
+       (cl:write-string string output-stream :start start :end end)
        string))
 
   (:post-condition
-   (declare (ignore args output-stream output-stream-p start end))
+   (declare (ignore output-stream start end))
    (lambda (output)
      (and
       (equal string output))))
   
   (:difference
-   (declare (ignore args output-stream output-stream-p string start end))
+   (declare (ignore output-stream string start end))
    (lambda (output)
      (declare (ignore output))
      (lambda (removed added)
@@ -343,12 +340,10 @@
 ;; ----------------------------------------------------------------------------
 
 (defaction delete-directory-tree (directory-pathname
-                                  &rest args
                                   &key validate (if-does-not-exist :error))
   "Sandboxable version of uiop:delete-directory-tree."
 
   (:pre-condition
-   (declare (ignore args))
    (and (member if-does-not-exist '(:ignore :error))
         (pathnamep directory-pathname)
         (uiop:directory-pathname-p directory-pathname)
@@ -367,19 +362,21 @@
   (:body
    (validate-access directory-pathname)
    (if (execute-p)
-       (apply #'uiop:delete-directory-tree directory-pathname args)
+       (uiop:delete-directory-tree directory-pathname
+                                   :validate validate
+                                   :if-does-not-exist if-does-not-exist)
        (clfs-sandbox:delete-directory-tree *sandbox* directory-pathname
                                       :validate validate
                                       :if-does-not-exist if-does-not-exist)))
   
   (:post-condition
-   (declare (ignore args validate if-does-not-exist))
+   (declare (ignore validate if-does-not-exist))
    (lambda (result)
      (declare (ignore result))
      (not (directory-exists-p directory-pathname))))
   
   (:difference
-   (declare (ignore args validate if-does-not-exist))
+   (declare (ignore validate if-does-not-exist))
    (let ((existed (directory-exists-p directory-pathname)))
      (lambda (result)
        (declare (ignore result))
@@ -644,12 +641,10 @@
                    always (subpathp* abs-to new))))))))
 
 (defaction safe-delete-directory-tree (directory-pathname
-                                       &rest args
                                        &key validate (if-does-not-exist :error))
   "Sandboxable version of uiop:delete-directory-tree."
 
   (:pre-condition
-   (declare (ignore args))
    (and (member if-does-not-exist '(:ignore :error))
         (pathnamep directory-pathname)
         (uiop:directory-pathname-p directory-pathname)
@@ -669,7 +664,9 @@
    (validate-access directory-pathname)
    (handler-case
        (if (execute-p)
-           (apply #'uiop:delete-directory-tree directory-pathname args)
+           (uiop:delete-directory-tree directory-pathname
+                                       :validate validate
+                                       :if-does-not-exist if-does-not-exist)
            (clfs-sandbox:delete-directory-tree *sandbox* directory-pathname
                                           :validate validate
                                           :if-does-not-exist if-does-not-exist))
@@ -677,13 +674,13 @@
      (condition () nil)))
   
   (:post-condition
-   (declare (ignore args validate if-does-not-exist))
+   (declare (ignore validate if-does-not-exist))
    (lambda (result)
      ;;(declare (ignore result))
      (implies result (not (directory-exists-p directory-pathname)))))
   
   (:difference
-   (declare (ignore args validate if-does-not-exist))
+   (declare (ignore validate if-does-not-exist))
    (let ((existed (directory-exists-p directory-pathname)))
      (lambda (result)
        (declare (ignore result))
