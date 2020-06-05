@@ -196,6 +196,11 @@ sandboxable getcwd."
 
 (defun open-file-p (file)
   "Is argument file the pathname of some open stream. Sandboxable."
+  ;; If in ccl renaming an open is allowed then open-file-p no longer
+  ;; works properly. The open-file-p test depends on a stream's
+  ;; pathname, but ccl does not update the a stream's path on
+  ;; rename. Note that truename on the stream after renaming gives an
+  ;; error.
   (when (file-exists-p file)
     (loop
        with abs = (truename file)

@@ -218,7 +218,7 @@
                       (equal if-exists :supersede))
                   (and (null (rest added))
                        (loop for x in added
-                          always (is-bak-file filename x)))
+                          always (is-bak-file (absolute-pathname filename) x)))
                   (null added))
               (if (null if-does-not-exist)
                   (null added)
@@ -431,9 +431,11 @@
 
   (:body
    (validate-access filename)
-   (if (execute-p)
-       (uiop:delete-file-if-exists filename)
-       (clfs-sandbox:delete-file-if-exists *sandbox* filename)))
+   ;; open-file-p added for ccl
+   (unless (open-file-p filename)
+     (if (execute-p)
+         (uiop:delete-file-if-exists filename)
+         (clfs-sandbox:delete-file-if-exists *sandbox* filename))))
   
   (:post-condition
    (let ((existed (file-exists-p filename))) 
@@ -749,10 +751,13 @@
   (:body
    (validate-access filespec)
    (validate-access new-name)
-      (handler-case
-          (if (execute-p)
-              (cl:rename-file filespec new-name)
-              (clfs-sandbox:rename-file *sandbox* filespec new-name))
+   (handler-case
+       ;; This test prevents ccl from renaming an open file. See the
+       ;; comments in open-file-p.
+       (unless (open-file-p filespec)
+         (if (execute-p)
+             (cl:rename-file filespec new-name)
+             (clfs-sandbox:rename-file *sandbox* filespec new-name)))
      (file-error () nil)
      (condition () nil)))
 
