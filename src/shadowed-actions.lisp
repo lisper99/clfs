@@ -168,7 +168,6 @@
     (not (wild-pathname-p filename))
     (uiop:file-pathname-p filename)
     (not (directory-exists-p filename))
-    ;;(not (open-file-p filename))
     (not (and (equal if-exists :rename) (open-file-p filename)))
     (if (file-exists-p filename)
         (or (equal direction :input)
@@ -431,7 +430,7 @@
 
   (:body
    (validate-access filename)
-   ;; open-file-p added for ccl
+   ;; See open-file-p
    (unless (open-file-p filename)
      (if (execute-p)
          (uiop:delete-file-if-exists filename)
@@ -654,7 +653,6 @@
         (implies (equal if-does-not-exist :error)
                  (directory-exists-p directory-pathname))
         (uiop:call-function validate directory-pathname)
-        ;;(not (any-open-file-p directory-pathname))
         (implies (directory-exists-p directory-pathname)
                  (let ((cwd (getcwd))
                        (truename (truename directory-pathname)))
@@ -703,13 +701,12 @@
   (:pre-condition
     (and
      (not (wild-pathname-p filespec))
-     #+ccl(not (open-file-p filespec))
      (file-exists-p filespec)))
   
    (:body 
     (validate-access filespec)
     (handler-case
-        (progn
+        (unless (open-file-p filespec)
           (if (execute-p)
               (cl:delete-file filespec)
               (clfs-sandbox:delete-file *sandbox* filespec))
@@ -744,7 +741,6 @@
       (not (wild-pathname-p new-name))
       (uiop:file-pathname-p name)
       (file-exists-p filespec)
-      ;;(not (open-file-p filespec))
       (directory-exists-p (uiop:pathname-directory-pathname name))
       (not (probe-file* name)))))
 
@@ -752,8 +748,8 @@
    (validate-access filespec)
    (validate-access new-name)
    (handler-case
-       ;; This test prevents ccl from renaming an open file. See the
-       ;; comments in open-file-p.
+       ;; This test prevents renaming an open file. See the comments
+       ;; in open-file-p.
        (unless (open-file-p filespec)
          (if (execute-p)
              (cl:rename-file filespec new-name)
@@ -796,9 +792,7 @@
       (not (wild-pathname-p new-name))
       (not (uiop:pathname-equal name (pathname filespec)))
       (file-exists-p filespec)
-;;      (not (open-file-p filespec))
       (not (directory-exists-p name))
-      ;;(implies (file-exists-p name) (not (open-file-p name)))
       (directory-exists-p (uiop:pathname-directory-pathname name)))))
   
   (:body
