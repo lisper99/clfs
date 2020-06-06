@@ -42,7 +42,9 @@
   (:body
    (validate-access path)
    (if (execute-p)
-       (cl:ensure-directories-exist path :verbose verbose)
+       (cl:ensure-directories-exist #+abcl (absolute-pathname path)
+                                    #-abcl path
+                                    :verbose verbose)
        (clfs-sandbox:ensure-directories-exist *sandbox* path :verbose verbose)))
 
   (:post-condition
@@ -50,8 +52,11 @@
    (lambda (pathspec created)
      (declare (ignore created))
      (and
-      (uiop:pathname-equal pathspec path)
-      (directory-exists-p path))))
+      (uiop:pathname-equal pathspec
+                           #+abcl (absolute-pathname path)
+                           #-abcl path)
+      (directory-exists-p #+abcl (absolute-pathname path)
+                          #-abcl path))))
 
   (:difference
    (declare (ignore verbose))
@@ -89,11 +94,11 @@
   (:post-condition
    (let ((filename (truename filespec)))
      (lambda (default old new)
-       ;; HyperSpec says (merge-pathnames new-name filespec) but
-       ;; sbcl and ccl seem to do (merge-pathnames new-name filename).
-       ;; Is that logical?
-       (let (#-(or sbcl ccl)(name (merge-pathnames new-name filespec))
-             #+(or sbcl ccl)(name (merge-pathnames new-name filename)))
+       ;; HyperSpec says (merge-pathnames new-name filespec) but sbcl,
+       ;; ccl and abcl seem to do (merge-pathnames new-name filename).
+       ;; Is that logical? LispWorks follows the HyperSpec.
+       (let (#-(or abcl sbcl ccl)(name (merge-pathnames new-name filespec))
+             #+(or abcl sbcl ccl)(name (merge-pathnames new-name filename)))
          (and
           (uiop:pathname-equal default name)
           (uiop:pathname-equal old filename)
@@ -246,9 +251,9 @@
    (let ((openp (open-stream-p stream)))
      (lambda (result)
        (and
-        (if (and #-(or sbcl clisp) nil
-                 (execute-p))
-            (equiv result t)
+        (if (execute-p)
+            #+(or sbcl clisp abcl) (equiv result t)
+            #-(or sbcl clisp abcl) (equiv result openp)
             (equiv result openp))
         (implies (file-exists-p (pathname stream))
                  (not (open-stream-p stream)))))))
@@ -433,13 +438,18 @@
    ;; See open-file-p
    (unless (open-file-p filename)
      (if (execute-p)
-         (uiop:delete-file-if-exists filename)
+         #-abcl (uiop:delete-file-if-exists filename)
+         #+abcl (when (file-exists-p filename)
+                  (uiop:delete-file-if-exists filename))
          (clfs-sandbox:delete-file-if-exists *sandbox* filename))))
   
   (:post-condition
    (let ((existed (file-exists-p filename))) 
      (lambda (result)
-       (equiv result (and existed (not (file-exists-p filename)))))))
+       #-abcl(equiv result
+                    (and existed (not (file-exists-p filename))))
+       #+abcl(implies result
+                      (not (file-exists-p filename))))))
   
   (:difference
    (let ((truename (when (file-exists-p filename)
@@ -511,7 +521,9 @@
    (loop for path in pathnames
       do (validate-access path))
    (if (execute-p)
-       (uiop:ensure-all-directories-exist pathnames)
+       (uiop:ensure-all-directories-exist
+        #+abcl (mapcar #'absolute-pathname pathnames)
+        #-abcl pathnames)
        (clfs-sandbox:ensure-all-directories-exist *sandbox* pathnames)))
   
   (:post-condition
@@ -762,8 +774,8 @@
      (lambda (default &optional old new)
        (implies
         default
-        (let (#-(or sbcl ccl) (name (merge-pathnames new-name filespec))
-              #+(or sbcl ccl) (name (merge-pathnames new-name filename)))
+        (let (#-(or abcl sbcl ccl) (name (merge-pathnames new-name filespec))
+                #+(or abcl sbcl ccl) (name (merge-pathnames new-name filename)))
           (and
            (uiop:pathname-equal default name)
            (uiop:pathname-equal old filename)

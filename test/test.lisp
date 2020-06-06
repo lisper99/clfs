@@ -660,7 +660,10 @@ action) instead of (apply (first action) (rest action))."
   (:body
    (clfs::validate-access path)
    (if (clfs:execute-p)
-       (apply #'cl:ensure-directories-exist path args)
+       (apply #'cl:ensure-directories-exist
+              #+abcl (clfs::absolute-pathname path)
+              #-abcl path
+              args)
        (apply #'clfs-sandbox:ensure-directories-exist clfs:*sandbox* path args)))
   (:post-condition
    (declare (ignore args))
